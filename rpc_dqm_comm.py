@@ -26,6 +26,8 @@ def histogram_object(kname, run_number, ref_run_number):
     base = kname.split(r"/")[-1]
     measurable = base.split(r"_")[0]
     disk_wheel = base.split(r"_")[1]
+    if disk_wheel == r"W+0":
+        disk_wheel = r"W0"
     region = "barrel" if disk_wheel.startswith("W") else "endcap"
     station = base.split(r"_")[2]
     sector = base.split(r"_")[3][-2:]
@@ -73,8 +75,8 @@ def createRatio(h1, h2):
 
     return h3
 
-def createCanvasPads():
-    c = ROOT.TCanvas("c", "canvas", 800, 800)
+def createCanvasPads(name):
+    c = ROOT.TCanvas(name, "canvas", 800, 800)
     # Upper histogram plot is pad1
     pad1 = ROOT.TPad("pad1", "pad1", 0, 0.3, 1, 1.0)
     pad1.SetBottomMargin(0)  # joins upper and lower plot
@@ -94,10 +96,13 @@ def createCanvasPads():
  
  
 def ratioplot(histo, h1, h2, run_number, ref_run_number):
-    print(histo)
+    
+
     # create required parts
     h3 = createRatio(h1, h2)
-    c, pad1, pad2 = createCanvasPads()
+    c, pad1, pad2 = createCanvasPads(histo["path"])
+
+
 
     # draw everything
     pad1.cd()
@@ -110,9 +115,10 @@ def ratioplot(histo, h1, h2, run_number, ref_run_number):
     h2.SetLineWidth(3)
 
 
-    hs = ROOT.THStack("hs",histo['measurable']+"_"+histo['disk_wheel']+"_"+histo['station']+"_S"+histo['sector']+";;a.u.")
+    hs = ROOT.THStack("hs",histo['measurable']+" - "+histo['disk_wheel']+"_"+histo['station']+"_S"+histo['sector']+";;a.u.")
     hs.Add(h1)
     hs.Add(h2)
+
 
     hs.Draw("NOSTACK hist")
 
@@ -131,6 +137,7 @@ def ratioplot(histo, h1, h2, run_number, ref_run_number):
     leg.SetFillStyle(0)
     leg.SetTextFont(60)
     leg.SetTextSize(0.04)
+
     leg.AddEntry(h1,"Run: "+ run_number,"L")
     leg.AddEntry(h2,"Ref. Run: "+ ref_run_number,"L")
     leg.Draw()
@@ -139,9 +146,16 @@ def ratioplot(histo, h1, h2, run_number, ref_run_number):
     pad2.cd()
     h3.Draw("ep")
 
-    image_path = "images/"+histo['disk_wheel']+"_"+histo['station']+"_S"+histo['sector']+"_"+histo['measurable']
+    image_path = "images/"+histo['disk_wheel']+"_"+histo['station']+"_S"+histo['sector']
+    os.system("mkdir -p "+image_path)
+    image_path += "/"+histo['disk_wheel']+"_"+histo['station']+"_S"+histo['sector']+"_"+histo['measurable']
     c.SaveAs(image_path+".png")
     c.SaveAs(image_path+".pdf")
+
+    ks_test = h1.KolmogorovTest(h2)	
+
+    return ks_test
+
 
 
 
@@ -166,7 +180,6 @@ run_number = fname.split(r".root")[0][-6:]
 ref_run_number = ref_fname.split(r".root")[0][-6:]
 
 
-
 dqm_file = ROOT.TFile(fname)
 ref_dqm_file = ROOT.TFile(ref_fname)
 
@@ -178,6 +191,14 @@ for k, o in getall(dqm_file):
         list_of_histograms.append(histogram_object(k, run_number, ref_run_number))
         
 os.system("rm -rf images ; mkdir images")
-
+ks_probs = {}
 for h in list_of_histograms:
-    ratioplot(*get_histograms(h, dqm_file, ref_dqm_file), run_number, ref_run_number)
+    ks_probs[h['disk_wheel']+"_"+h['station']+"_S"+h['sector']+"_"+h['measurable']] = ratioplot(*get_histograms(h, dqm_file, ref_dqm_file), run_number, ref_run_number)
+
+
+# Save KS Tests results
+import json
+print(ks_probs)
+os.system("rm -rf ks_probs.json")
+with open('ks_probs.json', 'w') as fp:
+    json.dump(ks_probs, fp)
