@@ -196,6 +196,10 @@ for h in list_of_histograms:
     ks_probs[h['disk_wheel']+"_"+h['station']+"_S"+h['sector']+"_"+h['measurable']] = ratioplot(*get_histograms(h, dqm_file, ref_dqm_file), run_number, ref_run_number)
 
 
+# Copy index.php
+os.system("find images/ -type d -exec cp index.php {} \;")
+
+
 # Save KS Tests results
 import json
 print(ks_probs)
